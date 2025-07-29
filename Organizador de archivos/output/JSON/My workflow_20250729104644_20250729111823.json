@@ -1,0 +1,624 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "69cf57d7-7dcc-4af0-9113-4f9afa803b44",
+        "options": {
+          "allowedOrigins": "*",
+          "rawBody": false
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -448,
+        -352
+      ],
+      "id": "5cfc7c39-b512-41cd-ba6b-391d0c0f8af6",
+      "name": "Webhook",
+      "webhookId": "69cf57d7-7dcc-4af0-9113-4f9afa803b44"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d6eb01bd-d772-4229-a12d-8670e7bcc9cc",
+              "name": "sender",
+              "value": "={{ $json.body.data.key.remoteJid }}",
+              "type": "string"
+            },
+            {
+              "id": "d8a9ab70-86a9-4f6a-8e30-67bb7b0fddbd",
+              "name": "message_type",
+              "value": "={{ $json.body.data.messageType }}",
+              "type": "string"
+            },
+            {
+              "id": "1df00b4f-2bf8-49f6-a8c3-facaad1e0451",
+              "name": "voice_message",
+              "value": "={{ $json.body.data.message.base64 }}",
+              "type": "string"
+            },
+            {
+              "id": "d235cd6d-5eb9-49fa-804d-206a0f0c75b1",
+              "name": "text_message",
+              "value": "={{ $json.body.data.message.conversation }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -224,
+        -352
+      ],
+      "id": "f379b814-0d71-456f-9b82-e8182069e0ce",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "257cb9a7-db84-4819-b0a2-a8cae84633e9",
+              "leftValue": "={{ $json.message_type }}",
+              "rightValue": "conversation",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        -352
+      ],
+      "id": "43bd6af8-884a-4893-b2aa-6d634219d81c",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "operation": "toBinary",
+        "sourceProperty": "voice_message",
+        "options": {
+          "mimeType": "audio/ogg"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        224,
+        -256
+      ],
+      "id": "abc3c86e-285d-40bd-bc07-bfd85ee4b50e",
+      "name": "Convert to File"
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "operation": "transcribe",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        448,
+        -256
+      ],
+      "id": "c66577d3-2a93-4273-9c19-6209bb4cdf30",
+      "name": "Transcribe a recording",
+      "credentials": {
+        "openAiApi": {
+          "id": "UWrUQUNds3scvgwU",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.final_message }}",
+        "options": {
+          "systemMessage": "=Eres un asistente llamado AnalIA, que interpreta mensajes recibidos por WhatsApp para gestionar turnos odontológicos en Google Calendar.\nHoy es {{ $now }}. Zona horaria: America/Argentina/Buenos_Aires (UTC-3).\n\nTu trabajo es entender lo que el paciente necesita y actuar en consecuencia, usando las herramientas disponibles.\nSolo gestionas turnos. No respondés preguntas generales ni médicas.\n\nPuedes realizar las siguientes tareas:\ncrear_evento: cuando el paciente quiere pedir un turno nuevo\n\nreprogramar_evento: cuando quiere cambiar de día u horario un turno ya agendado\n\neliminar_evento: cuando quiere cancelar un turno\n\nconsultar_evento: cuando quiere saber cuándo tiene su próximo turno\n\nEjemplos de mensajes y sus intenciones:\n“Quiero un turno para el martes que viene a las 15” → crear_evento\n\n“Pasá mi turno del jueves al viernes a la mañana” → reprogramar_evento\n\n“Cancelame el turno de hoy” → eliminar_evento\n\n“¿Cuándo tenía el turno?” → consultar_evento\n\nHerramientas disponibles según la tarea:\ncrear_evento = agendar turno\n\nreprogramar_evento = reprogramar turno\n\neliminar_evento = cancelar turno\n\nconsultar_evento = consultar turnos\n\nReglas para la respuesta:\nRespondé con un tono natural, breve y amable, como si estuvieras escribiendo por WhatsApp.\n\nPodés usar emojis si es apropiado 😊\n\nExtraé toda la información posible: título (ej. “Turno odontológico”), fecha, hora, duración (asumí 1 hora si no se indica), y ubicación\n\nSiempre usá esta ubicación por defecto salvo que se indique otra:\n\n📍 Consultorio Odontológico Analía Rojas\nhttps://maps.app.goo.gl/RiECGkqfoYfeDtgu5\n\nEjemplos de respuestas:\nTurno creado:\n“Perfecto, te agendé el turno con la Dra. Rojas para el martes a las 15:00 😊”\n\nTurno reprogramado:\n“Listo, pasé tu turno al viernes a la mañana. ¡Nos vemos!”\n\nTurno cancelado:\n“Turno cancelado. Si querés sacar otro, avisame 👍”\n\nConsulta:\n“Tenés un turno con la Dra. Rojas el lunes a las 10:00 a.m.”\n\nSi el mensaje es ambiguo:\nPreguntá de forma amable para confirmar:\n“¿Querés que te saque un turno nuevo o reprogramamos uno ya existente?”\n\nInterpretación de expresiones comunes:\n“mañana a las 10am” → día siguiente, 10:00\n\n“el próximo lunes” → lunes siguiente a hoy\n\n“dentro de 8 días” → hoy + 8\n\n“este viernes por la tarde” → si el viernes ya pasó, es el siguiente"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.1,
+      "position": [
+        1120,
+        -352
+      ],
+      "id": "accd64b5-4851-47d5-8616-edfa414e1df8",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        896,
+        -128
+      ],
+      "id": "f4934b1b-4317-4377-9479-2e05d33711b0",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "UWrUQUNds3scvgwU",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Usa esta herramienta cuando el usuario quiera crear una nueva cita.",
+        "calendar": {
+          "__rl": true,
+          "value": "quintanafranco100@gmail.com",
+          "mode": "list",
+          "cachedResultName": "quintanafranco100@gmail.com"
+        },
+        "start": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Start', ``, 'string') }}",
+        "end": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('End', ``, 'string') }}",
+        "additionalFields": {
+          "description": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Description', ``, 'string') }}",
+          "summary": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Summary', ``, 'string') }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        -448,
+        -32
+      ],
+      "id": "958ba4dc-d553-45e2-a96d-a4399535ba77",
+      "name": "Agendar cita",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "UYk9kXyfspGDYokL",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Usa esta herramienta cuando el usuario quiera mover una cita a otro día u hora.",
+        "operation": "update",
+        "calendar": {
+          "__rl": true,
+          "value": "quintanafranco100@gmail.com",
+          "mode": "list",
+          "cachedResultName": "quintanafranco100@gmail.com"
+        },
+        "eventId": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Event_ID', ``, 'string') }}",
+        "updateFields": {}
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        1152,
+        -128
+      ],
+      "id": "89f257d1-44df-4bbf-b4c5-0da83da3b239",
+      "name": "Reprogramar cita",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "UYk9kXyfspGDYokL",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Usa esta herramienta si el usuario quiere eliminar una cita existente.",
+        "operation": "delete",
+        "calendar": {
+          "__rl": true,
+          "value": "quintanafranco100@gmail.com",
+          "mode": "list",
+          "cachedResultName": "quintanafranco100@gmail.com"
+        },
+        "eventId": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Event_ID', ``, 'string') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        1280,
+        -128
+      ],
+      "id": "3aa9d7a9-62ea-4dd6-a4d9-9502f6af86f4",
+      "name": "Cancelar cita",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "UYk9kXyfspGDYokL",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Usa herramienta si el usuario quiere saber cuando tiene una cita.",
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "quintanafranco100@gmail.com",
+          "mode": "list",
+          "cachedResultName": "quintanafranco100@gmail.com"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        1408,
+        -128
+      ],
+      "id": "d55d7224-3924-4466-9581-eca13bfb506d",
+      "name": "Consultar citas",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "UYk9kXyfspGDYokL",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "bc5618a0-e31d-4ae4-9d8c-6028a895b3a5",
+              "name": "final_message",
+              "value": "={{ $json.text_message }}",
+              "type": "string"
+            },
+            {
+              "id": "55482b49-2b9d-430f-9cd9-b395461be6ca",
+              "name": "session",
+              "value": "={{ $('Webhook').item.json.body.data.key.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        672,
+        -448
+      ],
+      "id": "08297a22-dcbf-4dbe-821f-a79fdad9a9f8",
+      "name": "Final Message Text"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "5a452b61-7ec9-4077-a8ba-cb95de91d8f6",
+              "name": "final_message",
+              "value": "={{ $json.text }}",
+              "type": "string"
+            },
+            {
+              "id": "0e8e2db2-3967-4286-a46a-77ea5c66ff9e",
+              "name": "session",
+              "value": "={{ $('Webhook').item.json.body.data.key.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        672,
+        -256
+      ],
+      "id": "a7c77ea0-d2fc-4b9e-a14a-1254ee1e1916",
+      "name": "Final Message Voice"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.final_message }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        1024,
+        -128
+      ],
+      "id": "ede591b0-4fea-4c95-af31-4484aba8b9ee",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://host.docker.internal:8080/message/sendText/{{ $('Webhook').item.json.body.instance }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "123456.+az1"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $('Edit Fields').item.json.sender.split('0')[0]}}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.output }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1744,
+        -352
+      ],
+      "id": "3d326910-d791-4ae4-b8d7-dd6bbec5454e",
+      "name": "HTTP Request",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Usa esta herramienta cuando el usuario quiera crear una nueva cita.",
+        "calendar": {
+          "__rl": true,
+          "value": "quintanafranco100@gmail.com",
+          "mode": "list",
+          "cachedResultName": "quintanafranco100@gmail.com"
+        },
+        "start": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Start', ``, 'string') }}",
+        "end": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('End', ``, 'string') }}",
+        "additionalFields": {
+          "description": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Description', ``, 'string') }}",
+          "summary": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Summary', ``, 'string') }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        1536,
+        -128
+      ],
+      "id": "3b876518-8fb9-4c30-96e3-5ca5bc27f64a",
+      "name": "Crear y agendar cita",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "UYk9kXyfspGDYokL",
+          "name": "Google Calendar account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Final Message Text",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File": {
+      "main": [
+        [
+          {
+            "node": "Transcribe a recording",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transcribe a recording": {
+      "main": [
+        [
+          {
+            "node": "Final Message Voice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agendar cita": {
+      "ai_tool": [
+        []
+      ]
+    },
+    "Reprogramar cita": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancelar cita": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar citas": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Final Message Text": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Final Message Voice": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crear y agendar cita": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Argentina/Buenos_Aires",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "7bd14c9b-2995-4fa5-a7e8-92ce1dded99b",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "bcf6dabf752a0fa7ae628646e78786f05775c929c5c6eb1ca4a5da65f988db5b"
+  },
+  "id": "TC6pXBUYhlVr9b2K",
+  "tags": []
+}

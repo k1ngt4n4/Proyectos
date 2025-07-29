@@ -1,0 +1,336 @@
+{
+  "name": "Automatic Invoice Detection & Reminder Creation with Gmail & Google Tasks",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "id": "95eeaaed-ce70-4f9d-82aa-e67bec2a84d2",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        496,
+        368
+      ],
+      "typeVersion": 1.2
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are an intelligent assistant that reads emails and determines whether the message is related to an invoice or a payment notification.\n\nYour tasks:\n1. Determine if the email is invoice-related.\n2. If yes, extract:\n   - Due date (in YYYY-MM-DD format, or null)\n   - Amount due (as a number, no currency symbols)\n\nAlways include these metadata values:\nId: {{ $json.id }}\nthreadId: {{ $json.threadId }}\nbody: {{ $json.text }}\nsubject: {{ $json.subject }}\nsender: {{ $json.from.value[0].name }}\n\nReturn only a valid JSON object in the format below:\n\n```json\n{\n  \"is_invoice\": true or false,\n  \"due_date\": \"YYYY-MM-DD\" or null,\n  \"amount_due\": number or null,\n  \"email_id\": \"string\",\n  \"thread_id\": \"string\",\n  \"sender\": \"string\",\n  \"subject\": \"string\"\n}",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "id": "46df89b3-2ac9-4905-ac0a-d4bcf4dbcf9a",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        944,
+        368
+      ],
+      "typeVersion": 2.1,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o",
+          "cachedResultName": "gpt-4o"
+        },
+        "options": {}
+      },
+      "id": "9f3cb030-5bbb-4203-b473-84e986ab1848",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        976,
+        592
+      ],
+      "typeVersion": 1.2,
+      "credentials": {
+        "openAiApi": {
+          "id": "UWrUQUNds3scvgwU",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{...}"
+      },
+      "id": "4fcf203d-d777-4aaf-b157-64f7ddea55c5",
+      "name": "Structured Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "position": [
+        1104,
+        592
+      ],
+      "typeVersion": 1.3
+    },
+    {
+      "parameters": {},
+      "id": "51db6f62-ddb6-4cb3-b33e-b1431cbe9ba2",
+      "name": "No Operation, do nothing",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        1568,
+        560
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "title": "=Invoice from {{ $json.output.sender }} – ${{ $json.output.amount_due }} due {{ $json.output.due_date }}",
+        "additionalFields": {}
+      },
+      "id": "a6abcee9-5187-4777-a843-1d7096ac674c",
+      "name": "Create a task",
+      "type": "n8n-nodes-base.googleTasks",
+      "position": [
+        1568,
+        176
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "operation": "addLabels",
+        "messageId": "={{ $json.output.email_id }}"
+      },
+      "id": "09aa7d30-3328-42ea-a4d5-66944b72d43a",
+      "name": "Add Label to Email",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        1568,
+        368
+      ],
+      "typeVersion": 2.1,
+      "webhookId": "c18520d1-31cc-4a12-a8d0-c6107c08762a"
+    },
+    {
+      "parameters": {
+        "operation": "markAsRead",
+        "messageId": "={{ $json.id }}"
+      },
+      "id": "7fca02d6-db42-430a-bf26-ef80f84eaee7",
+      "name": "Mark Email as read",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        1792,
+        368
+      ],
+      "typeVersion": 2.1,
+      "webhookId": "b1b2991a-953f-4da1-8243-8422f64466cf"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "simple": false,
+        "filters": {
+          "readStatus": "unread"
+        },
+        "options": {}
+      },
+      "id": "e360894f-77e8-49cb-b8ba-e2d271fd521e",
+      "name": "Get Unread Emails",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        720,
+        368
+      ],
+      "typeVersion": 2.1,
+      "webhookId": "34593005-02fa-432a-8ec8-df502f0d3e40"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "dc8158a0-29aa-4c7f-9de3-994a5d827331",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.output.is_invoice }}",
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f5674f2a-6875-4b89-94f8-13fb2d2c05fd",
+      "name": "Check If Email is Invoice",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1344,
+        368
+      ],
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "content": "### 💡 Customize Task Format  \nYou can change the title in this node.  For example: `Pay invoice from {{sender}} by {{due_date}}`  \nInclude more invoice details in the notes field if needed.",
+        "height": 288,
+        "width": 336,
+        "color": 5
+      },
+      "id": "a38b2d77-9ead-436d-ab40-12fcced60f72",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1456,
+        48
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "### ⚠️ Setup Required  \n- Connect your Gmail account using OAuth2  \n- Add your OpenAI API Key under **API Credentials**  \n- Connect your Google Tasks account  \n- Create this label in Gmail: **Invoice**",
+        "height": 224,
+        "width": 304
+      },
+      "id": "2f9a2857-ebe6-4d0f-a583-af4b655e4844",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        432,
+        656
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "### 💡 Schedule Trigger  \nThis runs every hour.  \nYou can change the interval here depending on how often you want Gmail to be checked.",
+        "height": 272,
+        "width": 320,
+        "color": 5
+      },
+      "id": "6da66212-1ddb-4822-b660-70e0a94dc0b2",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        368,
+        240
+      ],
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Check If Email is Invoice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Unread Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Unread Emails": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Label to Email": {
+      "main": [
+        [
+          {
+            "node": "Mark Email as read",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Email is Invoice": {
+      "main": [
+        [
+          {
+            "node": "Add Label to Email",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Create a task",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "versionId": "6db0fb1e-4393-4b6b-ad58-fab8061e991c",
+  "meta": {
+    "templateId": "5863",
+    "instanceId": "bcf6dabf752a0fa7ae628646e78786f05775c929c5c6eb1ca4a5da65f988db5b"
+  },
+  "id": "zITgd5ojAFPrELyT",
+  "tags": []
+}
